@@ -1,3 +1,6 @@
+;; This buffer is for text that is not saved, and for Lisp evaluation.
+;; To create a file, visit it with C-x C-f and enter text in its buffer.
+
 ;;; ag.el --- A front-end for ag ('the silver searcher'), the C ack replacement.
 
 ;; Copyright (C) 2013-2014 Wilfred Hughes <me@wilfred.me.uk>
@@ -249,7 +252,7 @@ If REGEXP is non-nil, treat STRING as a regular expression."
       (error "No such directory %s" default-directory))
     (let ((command-string
            (mapconcat #'shell-quote-argument
-                      (append (list ag-executable) arguments (append `(,string) files))
+                      (append (list (ag/ag-executable)) arguments (append `(,string) files))
                       " ")))
       ;; If we're called with a prefix, let the user modify the command before
       ;; running it. Typically this means they want to pass additional arguments.
@@ -549,12 +552,12 @@ See also `find-dired'."
                           "*ag dired*"
                         (format "*ag dired pattern:%s dir:%s*" regexp dir)))
          (cmd (if (string= system-type "windows-nt")
-                  (concat ag-executable " " (combine-and-quote-strings ag-dired-arguments " ") " -g \"" regexp "\" "
+                  (concat (ag/ag-executable) " " (combine-and-quote-strings ag-dired-arguments " ") " -g \"" regexp "\" "
                           (shell-quote-argument dir)
                           " | grep -v \"^$\" | sed \"s/'/\\\\\\\\'/g\" | xargs -I '{}' "
                           insert-directory-program " "
                           dired-listing-switches " '{}' &")
-                (concat ag-executable " " (combine-and-quote-strings ag-dired-arguments " ") " -g '" regexp "' "
+                (concat (ag/ag-executable) " " (combine-and-quote-strings ag-dired-arguments " ") " -g '" regexp "' "
                         (shell-quote-argument dir)
                         " | grep -v '^$' | sed s/\\'/\\\\\\\\\\'/g | xargs -I '{}' "
                         insert-directory-program " "
@@ -663,7 +666,7 @@ This function is called from `compilation-filter-hook'."
 
 (defun ag/get-supported-types ()
   "Query the ag executable for which file types it recognises."
-  (let* ((ag-output (shell-command-to-string (format "%s --list-file-types" ag-executable)))
+  (let* ((ag-output (shell-command-to-string (format "%s --list-file-types" (ag/ag-executable))))
          (lines (-map #'s-trim (s-lines ag-output)))
          (types (--keep (when (s-starts-with? "--" it) (s-chop-prefix "--" it )) lines))
          (extensions (--map (s-split "  " it) (--filter (s-starts-with? "." it) lines))))
@@ -683,6 +686,14 @@ This function is called from `compilation-filter-hook'."
       (list :file-regex
             (read-from-minibuffer "Filenames which match PCRE: "
                                   (ag/buffer-extension-regex))))))
+
+(defun ag/ag-executable ()
+  "Expand ag-executable path if needed.
+This is needed if ag-executable is set to point to a path under
+your home directory."
+  (if (string-match "^~" ag-executable)
+      (expand-file-name ag-executable)
+    ag-executable))
 
 (provide 'ag)
 ;;; ag.el ends here
